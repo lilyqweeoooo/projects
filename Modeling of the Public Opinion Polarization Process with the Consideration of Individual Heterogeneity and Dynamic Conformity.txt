@@ -1,0 +1,186 @@
+
+%% Network structure
+%% WS
+% The simulation of WS-smallworld network
+% the algorithm of WS-smallworld's generation has been improved in speed,
+% and tend to be easily understood
+% writen by winter-my-dream@hotmail.com
+% Example:
+% N = 100; %network size (number of nodes)
+% m = 6; %2*m is the average edges of each nodes
+% p = 0.1; %rewiring probability
+% matrix = small_world_WS_new(N,m,p);
+function matrix = small_world_WS_new(N,m,p)
+rng('default')
+rng('shuffle')
+matrix=zeros(N,N);
+% generate regular network
+for i=m+1:N-m
+    matrix(i,i-m:i+m)=1;
+end
+for i=1:m
+    matrix(i,1:i+m)=1;
+end
+for i=N-m+1:N
+    matrix(i,i-m:N)=1;
+end
+for i=1:m
+    matrix(i,N-m+i:N)=1;
+    matrix(N-m+i:N,i)=1;
+end
+% rewiring the network
+for i = 1:N
+    % then rewiring the edges with the probability of p
+    [series1,series2] = range_sort(N,m,i);
+    index0 = series1(rand(2*m,1)>1-p);
+    if(~isempty(index0))
+        matrix(i,index0) = 0;
+        matrix(i,series2(randperm(length(series2),length(index0))))=1;
+    end
+end
+matrix = matrix -diag(diag(matrix));
+end
+
+function [series1,series2] = range_sort(N,m,i)
+% select the index of nodes in row i for rewiring
+if(i-m>0 && i+m<=N)
+    series1 = i-m:i+m;
+    series2 = setdiff(1:N,series1);
+elseif(i-m<=0)
+    series1 = [1:i+m,N-m+i:N];
+    series2 = setdiff(1:N,series1);
+else
+    series1 = [1:m-N+i,i-m:N];
+    series2 = setdiff(1:N,series1);
+end
+% Without considering the connection of diagonal elements
+series1(series1==i) = [];
+end
+
+
+
+%% Network structure
+%% BA
+function A = BANetwork(N,m)
+N=100;
+m=2
+A=zeros(N);
+list=zeros(1);
+x=zeros(1,N);
+y=zeros(1,N);
+for i=1:m
+    A(i,m+1)=1;
+    A(m+1,i)=1;
+    list(i)=i;
+end
+theta=0:2*pi/m:2*pi*(1-1/m);
+for i=1:m
+    x(i)=20*sin(theta(i));
+    y(i)=20*cos(theta(i));
+end
+for i=m+1:2*m
+    list(i)=m+1;
+end
+p1=unidrnd(m,1,1);
+x(m+1)=x(p1)+20*sin(theta(p1));
+y(m+1)=y(p1)+20*cos(theta(p1));
+
+theta=0:2*pi/N:2*pi*(1-1/N);
+for n =m+2:N
+    t=2*m*(n-m-1);
+    for i=1:m
+        list(t+i)=n;
+    end
+    k=1;
+    while k<m+1
+        p(k)=unidrnd(t,1,1);
+        if k==1
+            p2=unidrnd(N,1,1);
+            x(n)=x(list(p(k)))+20*sin(theta(p2));
+            y(n)=y(list(p(k)))+20*cos(theta(p2));
+        end
+        if A(n,list(p(k)))==0
+            list(t+m+k)=list(p(k));
+            A(n,list(p(k)))=1;
+            A(list(p(k)),n)=1;
+            k=k+1;
+        end
+    end
+end
+hold on
+for i=1:N
+    for j=i+1:N
+        if A(i,j)~=0
+            plot([x(i),x(j)],[y(i),y(j)],'-','linewidth',0.8);
+        end
+    end
+end
+for i=1:N
+    plot(x(i),y(i),'or','MarkerFaceColor','r','markersize',10)
+    text(x(i)+0.5,y(i)+0.5,num2str(i));
+end
+
+
+%% Evolution of public opinion
+
+DU=sum(A,2);
+for i=1:N
+    if DU(i)==0
+        Z(i,:)=0;
+    else
+        for j=1:N
+            Z(i,j)=DU(j)/DU(i).*A(i,j);
+        end
+    end
+end %%
+Z=Z.*A;
+
+
+load A;load Z;load attitude; %% Import network data
+for time=1:MM  %% MM denotes the number of iterations
+    %%
+    Xa=sum(sum(attitude))/N; %%%社会环境
+    %        shehuipingjun=[shehuipingjun Xa];
+    %         Pa=(1-std(attitude))./(SIGMA^1);%% Dispersion degree
+    Pa=1-std(attitude);%%%社会分化
+    %        shehuifenhua=[shehuifenhua Pa];
+    jieshou_a=Pa.*Xa; %%接受到的
+    %           jieshou_a(find(jieshou_a>1))=1;
+    %           jieshou_a(find(jieshou_a<-1))=-1;
+    %%
+    %         fenxiyinxiang=sum(Z,2);
+    %         jieshou_b=Z.*attitude./sum(Z,2).*A(i,j);
+    jieshou_b=Z*attitude./sum(Z,2);
+    %         jieshou_b(isnan(jieshou_b))=0;
+    %%
+    jieshou=Ha.*jieshou_a+Hb.*jieshou_b;  %% 调节
+    Hb=1-Ha*Pa;
+    jieshou(jieshou>1)=1;
+    jieshou(jieshou<-1)=-1;
+    %%
+    for i=1:N
+        HH(i)=exp(k1(i)/NN(i))-1+ C(i); %% Self confidence
+        
+        if abs(attitude(i)-jieshou(i))<=d1  %
+            attitude(i)=HH(i).*attitude(i)-(1-HH(i)).*(attitude(i)-jieshou(i));
+        elseif abs(attitude(i)-jieshou(i))>=d2
+            attitude(i)=HH(i).*attitude(i)+(1-HH(i)).*(attitude(i)-jieshou(i));
+        else
+            attitude(i)=attitude(i);
+        end
+        if attitude(i)>1
+            attitude(i)=1;
+        end
+        if attitude(i)<-1
+            attitude(i)=-1;
+        end
+        if jieshou(i)*attitude(i)>0
+            k1(i)=k1(i)+1;%% Number of affirmations recorded
+        end
+        NN(i)=NN(i)+1;
+    end
+    atrec(time,:)=attitude';  %% Storage attitude
+    SIGMA=std(attitude);
+end
+%%
+plot(atrec);
